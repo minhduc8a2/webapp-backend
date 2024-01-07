@@ -11,7 +11,7 @@ const fieldList = [
 ]
 const collection = "DocGia"
 const singleCollectionName = "DocGia"
-//configure in create method also
+//configure in create, update method also
 //
 
 const ApiError = require("../api-error")

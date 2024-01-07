@@ -9,7 +9,7 @@ const fieldList = [
 ]
 const collection = "NhanVien"
 const singleCollectionName = "NhanVien"
-//configure in create method also
+//configure in create, update method also
 //
 
 const ApiError = require("../api-error")

@@ -2,7 +2,7 @@
 const fieldList = ["MaNXB", "TenNXB", "DiaChi"]
 const collection = "NhaXuatBan"
 const singleCollectionName = "NhaXuatBan"
-//configure in create method also
+//configure in create, update method also
 //
 
 const ApiError = require("../api-error")
