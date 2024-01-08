@@ -22,7 +22,7 @@ exports.create = async (req, res, next) => {
     return next(new ApiError(400, "Form cannot be empty"))
   }
   fieldList.forEach((field) => {
-    if (!req.body[field]) {
+    if (!req.body.hasOwnProperty(field) || req.body[field].length == 0) {
       return next(new ApiError(400, field + " cannot be empty"))
     }
   })

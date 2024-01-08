@@ -17,6 +17,7 @@ const bookFieldList = [
 ]
 const bookCollection = "Sach"
 const bookStatus = {
+  Cancelled: "Cancelled",
   Pending: "Pending",
   Rejected: "Rejected",
   Accepted: "Accepted",
@@ -37,10 +38,10 @@ exports.create = async (req, res, next) => {
   }
 
   //default value
-  req.body.TrangThai = "pending"
+  req.body.TrangThai = bookStatus.Pending
   //
   for (let field of fieldList) {
-    if (!req.body[field]) {
+    if (!req.body.hasOwnProperty(field) || req.body[field].length == 0) {
       return next(new ApiError(400, field + " cannot be empty"))
     }
   }
@@ -134,49 +135,93 @@ exports.findOne = async (req, res, next) => {
   }
 }
 exports.update = async (req, res, next) => {
-  if (Object.keys(req.body).length === 0) {
-    return next(new ApiError(400, "Data to update cannot be empty"))
+  if (!req.body.TrangThai) {
+    return next(new ApiError(400, "TrangThai cannot be empty"))
   }
-  for (let field of fieldList) {
-    if (!req.body[field]) {
-      return next(new ApiError(400, field + " cannot be empty"))
-    }
-  }
+
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
 
-    //check exists
-
-    let documents = await dbService.find({
-      MaSach: req.body.MaSach,
-      MaDocGia: req.body.MaDocGia,
-      NgayMuon: req.body.NgayMuon,
-    })
-    if (documents.length > 0 && documents[0]._id != req.params.id) {
-      return next(new ApiError(400, `TheoDoiMuonSach đã tồn tại!`))
-    }
+    let currentDocument = await dbService.findById(req.params.id)
 
     //  check change status
-    const currentDocument = documents[0]
-    let willChangeSoQuyen,
-      willChangeDangMuon,
-      willChangeDangYeuCau = 0
+
+    let willChangeSoQuyen = 0
+    let willChangeDangMuon = 0
+    let willChangeDangYeuCau = 0
     let willChangeStatus = req.body.TrangThai
+
     if (
       currentDocument.TrangThai == bookStatus.Pending ||
       currentDocument.TrangThai == bookStatus.Accepted
     ) {
-      if (willChangeStatus == "borrowed") {
+      if (willChangeStatus == bookStatus.Borrowed) {
         willChangeDangMuon = 1
         willChangeDangYeuCau = -1
-      }
-      if (willChangeStatus == "cancelled") {
+      } else if (
+        willChangeStatus == bookStatus.Cancelled ||
+        willChangeStatus == bookStatus.Rejected
+      ) {
         willChangeSoQuyen = 1
         willChangeDangYeuCau = -1
       }
+    } else if (currentDocument.TrangThai == bookStatus.Borrowed) {
+      if (
+        willChangeStatus == bookStatus.Pending ||
+        willChangeStatus == bookStatus.Accepted
+      ) {
+        willChangeDangMuon = -1
+        willChangeDangYeuCau = 1
+      } else if (
+        willChangeStatus == bookStatus.Cancelled ||
+        willChangeStatus == bookStatus.Rejected
+      ) {
+        willChangeDangMuon = -1
+        willChangeSoQuyen = 1
+      }
+    } else if (
+      currentDocument.TrangThai == bookStatus.Cancelled ||
+      currentDocument.TrangThai == bookStatus.Rejected
+    ) {
+      if (willChangeStatus == bookStatus.Borrowed) {
+        willChangeDangMuon = 1
+        willChangeSoQuyen = -1
+      } else if (
+        willChangeStatus == bookStatus.Pending ||
+        willChangeStatus == bookStatus.Accepted
+      ) {
+        willChangeDangYeuCau = 1
+        willChangeSoQuyen = -1
+      }
+    }
+    const bookDBService = new DatabaseService(
+      MongoDB.client,
+      bookCollection,
+      bookFieldList
+    )
+    let getBook = await bookDBService.findById(currentDocument.MaSach)
+    if (!getBook) {
+      return next(new ApiError(404, `Book not found`))
+    }
+    console.log("currentbook: " + getBook)
+    console.log(willChangeDangMuon, willChangeDangYeuCau, willChangeSoQuyen)
+    console.log(
+      getBook.SoQuyen + willChangeSoQuyen,
+      getBook.DangMuon + willChangeDangMuon,
+      getBook.DangYeuCau + willChangeDangYeuCau
+    )
+    let updatedBook = await bookDBService.update(currentDocument.MaSach, {
+      SoQuyen: getBook.SoQuyen + willChangeSoQuyen,
+      DangMuon: getBook.DangMuon + willChangeDangMuon,
+      DangYeuCau: getBook.DangYeuCau + willChangeDangYeuCau,
+    })
+    if (!updatedBook) {
+      return next(new ApiError(404, `Failed to update book`))
     }
     //
-    let document = await dbService.update(req.params.id, req.body)
+    let document = await dbService.update(req.params.id, {
+      TrangThai: req.body.TrangThai,
+    })
 
     if (!document) {
       return next(new ApiError(404, `${singleCollectionName} not found`))
@@ -197,6 +242,47 @@ exports.update = async (req, res, next) => {
 exports.delete = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
+
+    //check exists
+
+    let currentDocument = await dbService.findById(req.params.id)
+    if (!currentDocument) {
+      return next(new ApiError(404, `BorrowTracker not found`))
+    }
+    //  check change status
+
+    let willChangeSoQuyen = 0
+    let willChangeDangMuon = 0
+    let willChangeDangYeuCau = 0
+
+    if (
+      currentDocument.TrangThai == bookStatus.Pending ||
+      currentDocument.TrangThai == bookStatus.Accepted
+    ) {
+      willChangeSoQuyen = 1
+      willChangeDangYeuCau = -1
+    } else if (currentDocument.TrangThai == bookStatus.Borrowed) {
+      willChangeSoQuyen = 1
+      willChangeDangMuon = -1
+    }
+    const bookDBService = new DatabaseService(
+      MongoDB.client,
+      bookCollection,
+      bookFieldList
+    )
+    let getBook = await bookDBService.findById(currentDocument.MaSach)
+    if (!getBook) {
+      return next(new ApiError(404, `Book not found`))
+    }
+    let updatedBook = await bookDBService.update(currentDocument.MaSach, {
+      SoQuyen: parseInt(getBook.SoQuyen) + willChangeSoQuyen,
+      DangMuon: parseInt(getBook.DangMuon) + willChangeDangMuon,
+      DangYeuCau: parseInt(getBook.DangYeuCau) + willChangeDangYeuCau,
+    })
+    if (!updatedBook) {
+      return next(new ApiError(404, `Failed to update book`))
+    }
+    //
 
     let document = await dbService.delete(req.params.id)
 
@@ -222,10 +308,61 @@ exports.delete = async (req, res, next) => {
 exports.deleteAll = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
+    const bookDBService = new DatabaseService(
+      MongoDB.client,
+      bookCollection,
+      bookFieldList
+    )
+    let borrowTrackerList = await dbService.find({})
+    let count = 0
+    for (let item of borrowTrackerList) {
+      let currentDocument = item
+      let document = await dbService.delete(currentDocument._id)
+      if (!document) {
+        return res.send(
+          ResponseTemplate(false, `${count} ${collection} deleted`, null)
+        )
+      }
+      //  check change status
 
-    let deletedCount = await dbService.deleteAll()
+      let willChangeSoQuyen = 0
+      let willChangeDangMuon = 0
+      let willChangeDangYeuCau = 0
+
+      if (
+        currentDocument.TrangThai == bookStatus.Pending ||
+        currentDocument.TrangThai == bookStatus.Accepted
+      ) {
+        willChangeSoQuyen = 1
+        willChangeDangYeuCau = -1
+      } else if (currentDocument.TrangThai == bookStatus.Borrowed) {
+        willChangeSoQuyen = 1
+        willChangeDangMuon = -1
+      }
+
+      let getBook = await bookDBService.findById(currentDocument.MaSach)
+      if (!getBook) {
+        return res.send(
+          ResponseTemplate(false, `${count} ${collection} deleted`, null)
+        )
+      }
+      console.log(willChangeSoQuyen, willChangeDangYeuCau, willChangeDangMuon)
+      let updatedBook = await bookDBService.update(currentDocument.MaSach, {
+        SoQuyen: getBook.SoQuyen + willChangeSoQuyen,
+        DangMuon: getBook.DangMuon + willChangeDangMuon,
+        DangYeuCau: getBook.DangYeuCau + willChangeDangYeuCau,
+      })
+      if (!updatedBook) {
+        return res.send(
+          ResponseTemplate(false, `${count} ${collection} deleted`, null)
+        )
+      }
+      //
+
+      count++
+    }
     return res.send(
-      ResponseTemplate(true, `${deletedCount} ${collection} deleted`, null)
+      ResponseTemplate(true, `${count} ${collection} deleted`, null)
     )
   } catch (error) {
     return next(
