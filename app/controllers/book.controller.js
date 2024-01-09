@@ -12,6 +12,11 @@ const fieldList = [
 ]
 const collection = "Sach"
 const singleCollectionName = "Sach"
+
+// configuration for NXB
+const NXBFieldList = ["MaNXB", "TenNXB", "DiaChi"]
+const NXBCollection = "NhaXuatBan"
+const NXBSingleCollectionName = "NhaXuatBan"
 //configure in create, update method also
 //
 
@@ -33,6 +38,11 @@ exports.create = async (req, res, next) => {
 
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
+    const NXBDbService = new DatabaseService(
+      MongoDB.client,
+      NXBCollection,
+      NXBFieldList
+    )
     //check if  exists
 
     let documents = await dbService.find({
@@ -46,6 +56,15 @@ exports.create = async (req, res, next) => {
         )
       )
     }
+    // check NXB exists
+    let NXBDoc = await NXBDbService.find({
+      MaNXB: req.body.MaNXB,
+    })
+    if (NXBDoc.length == 0) {
+      return next(new ApiError(400, `MaNXB doesn't exist!`))
+    }
+
+    //
 
     const mongoDocument = await dbService.create(req.body)
 
@@ -107,10 +126,18 @@ exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
     return next(new ApiError(400, "Data to update cannot be empty"))
   }
-
+  for (let field of fieldList) {
+    if (!req.body.hasOwnProperty(field) || req.body[field].length == 0) {
+      return next(new ApiError(400, field + " cannot be empty"))
+    }
+  }
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-
+    const NXBDbService = new DatabaseService(
+      MongoDB.client,
+      NXBCollection,
+      NXBFieldList
+    )
     //check exists
     if (req.body.MaSach) {
       let documents = await dbService.find({ MaSach: req.body.MaSach })
@@ -122,6 +149,13 @@ exports.update = async (req, res, next) => {
           )
         )
       }
+    }
+    // check NXB exists
+    let NXBDoc = await NXBDbService.find({
+      MaNXB: req.body.MaNXB,
+    })
+    if (NXBDoc.length == 0) {
+      return next(new ApiError(400, `MaNXB doesn't exist!`))
     }
 
     //

@@ -24,6 +24,20 @@ const bookStatus = {
   Borrowed: "Borrowed",
   Returned: "Returned",
 }
+
+// configuration for reader
+const readerFieldList = [
+  "MaDocGia",
+  "HoLot",
+  "Ten",
+  "NgaySinh",
+  "Phai",
+  "DiaChi",
+  "DienThoai",
+  "Password",
+]
+const readerCollection = "DocGia"
+const readerSingleCollectionName = "DocGia"
 //configure in create, update method also
 //
 
@@ -53,6 +67,11 @@ exports.create = async (req, res, next) => {
       bookCollection,
       bookFieldList
     )
+    const readerDBService = new DatabaseService(
+      MongoDB.client,
+      readerCollection,
+      readerFieldList
+    )
     //check if  exists
 
     let documents = await dbService.find({
@@ -61,12 +80,14 @@ exports.create = async (req, res, next) => {
       NgayMuon: req.body.NgayMuon,
     })
     if (documents.length > 0) {
-      return next(new ApiError(400, `TheoDoiMuonSach đã tồn tại!`))
+      return next(new ApiError(400, `Theo dõi mượn sách đã tồn tại!`))
     }
 
     //update so luong books in the library
     let book = await bookDBService.findOne({ MaSach: req.body.MaSach })
-
+    if (!book) {
+      return next(new ApiError(400, `Mã sách không tồn tại!`))
+    }
     if (book) {
       if (book.SoQuyen == 0) {
         return next(new ApiError(400, `Không còn sách để mượn`))
@@ -77,6 +98,12 @@ exports.create = async (req, res, next) => {
       })
     }
 
+    //
+    // check reader exists
+    let reader = await readerDBService.findOne({ MaDocGia: req.body.MaDocGia })
+    if (!reader) {
+      return next(new ApiError(400, `Mã đọc giả không tồn tại!`))
+    }
     //
 
     const mongoDocument = await dbService.create(req.body)
@@ -145,9 +172,20 @@ exports.update = async (req, res, next) => {
   }
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-
+    const readerDBService = new DatabaseService(
+      MongoDB.client,
+      readerCollection,
+      readerFieldList
+    )
     let currentDocument = await dbService.findById(req.params.id)
-
+    if (!currentDocument) {
+      return next(new ApiError(400, `Theo dõi mượn sách không tồn tại!`))
+    }
+    //check reader exists
+    let reader = await readerDBService.findOne({ MaDocGia: req.body.MaDocGia })
+    if (!reader) {
+      return next(new ApiError(400, `Mã đọc giả không tồn tại!`))
+    }
     //  check change status
 
     let willChangeSoQuyen = 0

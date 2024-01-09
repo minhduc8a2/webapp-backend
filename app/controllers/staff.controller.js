@@ -11,11 +11,22 @@ const collection = "NhanVien"
 const singleCollectionName = "NhanVien"
 //configure in create, update method also
 //
-
+var jwt = require("jsonwebtoken")
+const secretKey = "webapp_secret"
 const ApiError = require("../api-error")
 const DatabaseService = require("../services/database.service")
 const MongoDB = require("../utils/mongodb.ultil")
 const ResponseTemplate = require("../responseTemplate")
+
+function createToken(username) {
+  return jwt.sign(
+    {
+      data: username,
+    },
+    secretKey,
+    { expiresIn: 60 * 60 }
+  )
+}
 
 exports.create = async (req, res, next) => {
   if (!req.body) {
@@ -96,6 +107,24 @@ exports.findOne = async (req, res, next) => {
         `Error retrieving ${singleCollectionName} with id=${req.params.id}`
       )
     )
+  }
+}
+/// login: a different method
+exports.login = async (req, res, next) => {
+  try {
+    const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
+
+    document = await dbService.findOne({
+      MSNV: req.body.username,
+      Password: req.body.password,
+    })
+
+    if (!document) {
+      return res.send(ResponseTemplate(false, "", null))
+    }
+    return res.send(ResponseTemplate(true, "", createToken(req.body.username)))
+  } catch (error) {
+    return next(new ApiError(500, `Error with server`))
   }
 }
 exports.update = async (req, res, next) => {
