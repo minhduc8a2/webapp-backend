@@ -65,12 +65,13 @@ exports.create = async (req, res, next) => {
     }
 
     //update so luong books in the library
-    let book = await bookDBService.findById(req.body.MaSach)
+    let book = await bookDBService.findOne({ MaSach: req.body.MaSach })
+
     if (book) {
       if (book.SoQuyen == 0) {
         return next(new ApiError(400, `Không còn sách để mượn`))
       }
-      book = await bookDBService.update(req.body.MaSach, {
+      book = await bookDBService.update(book._id, {
         SoQuyen: book.SoQuyen - 1,
         DangYeuCau: book.DangYeuCau + 1,
       })
@@ -135,10 +136,13 @@ exports.findOne = async (req, res, next) => {
   }
 }
 exports.update = async (req, res, next) => {
-  if (!req.body.TrangThai) {
+  if (!req.body.TrangThai || !req.body.NgayMuon || !req.body.NgayTra) {
     return next(new ApiError(400, "TrangThai cannot be empty"))
   }
-
+  //check book status is valid
+  if (!bookStatus.hasOwnProperty(req.body.TrangThai)) {
+    return next(new ApiError(400, "TrangThai is not valid"))
+  }
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
 
@@ -199,7 +203,10 @@ exports.update = async (req, res, next) => {
       bookCollection,
       bookFieldList
     )
-    let getBook = await bookDBService.findById(currentDocument.MaSach)
+    let getBook = await bookDBService.findOne({
+      MaSach: currentDocument.MaSach,
+    })
+
     if (!getBook) {
       return next(new ApiError(404, `Book not found`))
     }
@@ -210,7 +217,7 @@ exports.update = async (req, res, next) => {
       getBook.DangMuon + willChangeDangMuon,
       getBook.DangYeuCau + willChangeDangYeuCau
     )
-    let updatedBook = await bookDBService.update(currentDocument.MaSach, {
+    let updatedBook = await bookDBService.update(getBook._id, {
       SoQuyen: getBook.SoQuyen + willChangeSoQuyen,
       DangMuon: getBook.DangMuon + willChangeDangMuon,
       DangYeuCau: getBook.DangYeuCau + willChangeDangYeuCau,
@@ -221,6 +228,8 @@ exports.update = async (req, res, next) => {
     //
     let document = await dbService.update(req.params.id, {
       TrangThai: req.body.TrangThai,
+      NgayMuon: req.body.NgayMuon,
+      NgayTra: req.body.NgayTra,
     })
 
     if (!document) {
@@ -270,11 +279,13 @@ exports.delete = async (req, res, next) => {
       bookCollection,
       bookFieldList
     )
-    let getBook = await bookDBService.findById(currentDocument.MaSach)
+    let getBook = await bookDBService.findOne({
+      MaSach: currentDocument.MaSach,
+    })
     if (!getBook) {
       return next(new ApiError(404, `Book not found`))
     }
-    let updatedBook = await bookDBService.update(currentDocument.MaSach, {
+    let updatedBook = await bookDBService.update(getBook._id, {
       SoQuyen: parseInt(getBook.SoQuyen) + willChangeSoQuyen,
       DangMuon: parseInt(getBook.DangMuon) + willChangeDangMuon,
       DangYeuCau: parseInt(getBook.DangYeuCau) + willChangeDangYeuCau,
@@ -340,14 +351,16 @@ exports.deleteAll = async (req, res, next) => {
         willChangeDangMuon = -1
       }
 
-      let getBook = await bookDBService.findById(currentDocument.MaSach)
+      let getBook = await bookDBService.findOne({
+        MaSach: currentDocument.MaSach,
+      })
       if (!getBook) {
         return res.send(
           ResponseTemplate(false, `${count} ${collection} deleted`, null)
         )
       }
       console.log(willChangeSoQuyen, willChangeDangYeuCau, willChangeDangMuon)
-      let updatedBook = await bookDBService.update(currentDocument.MaSach, {
+      let updatedBook = await bookDBService.update(getBook._id, {
         SoQuyen: getBook.SoQuyen + willChangeSoQuyen,
         DangMuon: getBook.DangMuon + willChangeDangMuon,
         DangYeuCau: getBook.DangYeuCau + willChangeDangYeuCau,

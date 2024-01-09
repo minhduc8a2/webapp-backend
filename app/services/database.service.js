@@ -26,7 +26,9 @@ class DatabaseService {
     const cursor = await this.collection.find(filter)
     return await cursor.toArray()
   }
-
+  async findOne(filter) {
+    return await this.collection.findOne(filter)
+  }
   async findByName(name) {
     return await this.find({
       name: { $regex: new RegExp(name), $option: "i" },
