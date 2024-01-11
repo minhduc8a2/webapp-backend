@@ -1,7 +1,7 @@
 const app = require("./app")
 const config = require("./app/config")
 const MongoDB = require("./app/utils/mongodb.ultil")
-
+require('dotenv').config()
 async function startServer() {
   try {
     await MongoDB.connect(config.db.uri)

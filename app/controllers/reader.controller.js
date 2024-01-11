@@ -11,6 +11,7 @@ const fieldList = [
 ]
 const collection = "DocGia"
 const singleCollectionName = "DocGia"
+const jwt = require("jsonwebtoken")
 //configure in create, update method also
 //
 
@@ -19,6 +20,32 @@ const DatabaseService = require("../services/database.service")
 const MongoDB = require("../utils/mongodb.ultil")
 const ResponseTemplate = require("../responseTemplate")
 
+function createToken(username) {
+  return jwt.sign(
+    {
+      data: username,
+    },
+    process.env.JWT_KEY,
+    { expiresIn: 60 * 60 }
+  )
+}
+exports.login = async (req, res, next) => {
+  if (req.logined) return res.send(ResponseTemplate(true, "", token))
+  try {
+    const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
+
+    document = await dbService.findOne({
+      MaDocGia: req.body.username,
+      Password: req.body.password,
+    })
+    if (!document) {
+      return res.send(ResponseTemplate(false, "", null))
+    }
+    return res.send(ResponseTemplate(true, "", createToken(req.body.username)))
+  } catch (error) {
+    return next(new ApiError(500, `Error with server`))
+  }
+}
 exports.create = async (req, res, next) => {
   if (!req.body) {
     return next(new ApiError(400, "Form cannot be empty"))
@@ -87,7 +114,7 @@ exports.findAll = async (req, res, next) => {
 exports.findOne = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    document = await dbService.findById(req.params.id)
+    document = await dbService.findOne({ MaDocGia: req.params.id })
     if (!document) {
       return next(new ApiError(404, `${singleCollectionName} not found`))
     }

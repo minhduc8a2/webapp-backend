@@ -108,7 +108,7 @@ exports.findAll = async (req, res, next) => {
 exports.findOne = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    document = await dbService.findById(req.params.id)
+    document = await dbService.findOne({ MaSach: req.params.id })
     if (!document) {
       return next(new ApiError(404, `${singleCollectionName} not found`))
     }

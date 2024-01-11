@@ -12,7 +12,7 @@ const singleCollectionName = "NhanVien"
 //configure in create, update method also
 //
 var jwt = require("jsonwebtoken")
-const secretKey = "webapp_secret"
+
 const ApiError = require("../api-error")
 const DatabaseService = require("../services/database.service")
 const MongoDB = require("../utils/mongodb.ultil")
@@ -23,7 +23,7 @@ function createToken(username) {
     {
       data: username,
     },
-    secretKey,
+    process.env.JWT_KEY,
     { expiresIn: 60 * 60 }
   )
 }
@@ -111,6 +111,7 @@ exports.findOne = async (req, res, next) => {
 }
 /// login: a different method
 exports.login = async (req, res, next) => {
+  if (req.logined) return res.send(ResponseTemplate(true, "", req.logined))
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
 
@@ -118,7 +119,6 @@ exports.login = async (req, res, next) => {
       MSNV: req.body.username,
       Password: req.body.password,
     })
-
     if (!document) {
       return res.send(ResponseTemplate(false, "", null))
     }
