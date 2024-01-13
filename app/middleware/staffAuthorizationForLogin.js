@@ -14,6 +14,7 @@ const MongoDB = require("../utils/mongodb.ultil")
 const jwt = require("jsonwebtoken")
 
 const auth = async (req, res, next) => {
+  console.log("admin login")
   const token = req.header("Authorization")?.replace("Bearer ", "")
   if (!token) return next()
   try {
@@ -29,7 +30,8 @@ const auth = async (req, res, next) => {
         req.logined = null
         return next()
       }
-      req.logined = token
+      req.logined = true
+      req.token = token
 
       next()
     } catch (error) {

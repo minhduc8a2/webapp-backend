@@ -9,6 +9,17 @@ const fieldList = [
   "DienThoai",
   "Password",
 ]
+const updateFieldList = [
+  //for update function
+
+  "HoLot",
+  "Ten",
+  "NgaySinh",
+  "Phai",
+  "DiaChi",
+  "DienThoai",
+  "Password",
+]
 const collection = "DocGia"
 const singleCollectionName = "DocGia"
 const jwt = require("jsonwebtoken")
@@ -20,17 +31,31 @@ const DatabaseService = require("../services/database.service")
 const MongoDB = require("../utils/mongodb.ultil")
 const ResponseTemplate = require("../responseTemplate")
 
-function createToken(username) {
+function createValidPayload(data, fieldList) {
+  let result = {}
+  Object.keys(data).forEach((key) => {
+    if (fieldList.find((item) => item == key)) {
+      result[key] = data[key]
+    }
+  })
+  return result
+}
+function createToken(username, type) {
   return jwt.sign(
     {
-      data: username,
+      username,
+      type,
     },
     process.env.JWT_KEY,
     { expiresIn: 60 * 60 }
   )
 }
 exports.login = async (req, res, next) => {
-  if (req.logined) return res.send(ResponseTemplate(true, "", token))
+  if (req.logined)
+    return res.send(
+      ResponseTemplate(true, "", { token: req.logined, reader: req.reader })
+    )
+
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
 
@@ -41,7 +66,18 @@ exports.login = async (req, res, next) => {
     if (!document) {
       return res.send(ResponseTemplate(false, "", null))
     }
-    return res.send(ResponseTemplate(true, "", createToken(req.body.username)))
+    return res.send(
+      ResponseTemplate(true, "", {
+        token: createToken(req.body.username, "reader"),
+        reader: {
+          MaDocGia: document.MaDocGia,
+          HoLot: document.HoLot,
+          Ten: document.Ten,
+          DiaChi: document.DiaChi,
+          DienThoai: document.DienThoai,
+        },
+      })
+    )
   } catch (error) {
     return next(new ApiError(500, `Error with server`))
   }
@@ -98,10 +134,8 @@ exports.findAll = async (req, res, next) => {
   let documents = []
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    const { name } = req.query
-    if (name) {
-      documents = await dbService.findByName(name)
-    } else documents = await dbService.find({})
+
+    documents = await dbService.find(req.query)
   } catch (error) {
     return next(
       new ApiError(500, `An error occurred while retrieving ${collection}`)
@@ -114,11 +148,46 @@ exports.findAll = async (req, res, next) => {
 exports.findOne = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    document = await dbService.findOne({ MaDocGia: req.params.id })
+    if (req.type == "reader") {
+      document = await dbService.findOne({ MaDocGia: req.username })
+    } else if (req.type == "staff") {
+      document = await dbService.findOne({ MaDocGia: req.params.id })
+    }
     if (!document) {
       return next(new ApiError(404, `${singleCollectionName} not found`))
     }
     return res.send(ResponseTemplate(true, "", document))
+  } catch (error) {
+    return next(
+      new ApiError(
+        500,
+        `Error retrieving ${singleCollectionName} with id=${req.params.id}`
+      )
+    )
+  }
+}
+exports.findOneInfo = async (req, res, next) => {
+  try {
+    const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
+    if (req.type == "reader") {
+      document = await dbService.findOne({ MaDocGia: req.username })
+    } else if (req.type == "staff") {
+      document = await dbService.findOne({ MaDocGia: req.params.id })
+    }
+    if (!document) {
+      return next(new ApiError(404, `${singleCollectionName} not found`))
+    }
+    return res.send(
+      ResponseTemplate(true, "", {
+        MaDocGia: document["MaDocGia"],
+        HoLot: document["HoLot"],
+        Ten: document["Ten"],
+        NgaySinh: document["NgaySinh"],
+        Phai: document["Phai"],
+        DiaChi: document["DiaChi"],
+        DienThoai: document["DienThoai"],
+      })
+    )
   } catch (error) {
     return next(
       new ApiError(
@@ -135,21 +204,34 @@ exports.update = async (req, res, next) => {
 
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    //check exists
-    if (req.body.MaDocGia) {
-      let documents = await dbService.find({ MaDocGia: req.body.MaDocGia })
-      if (documents.length > 0 && documents[0]._id != req.params.id) {
-        return next(
-          new ApiError(
-            400,
-            `MaDocGia is registerd by another ${singleCollectionName}!`
-          )
-        )
+    if (req.type == "reader") {
+      let document = await dbService.findOne({
+        MaDocGia: req.username,
+        Password: req.body.CurrentPassword,
+      })
+
+      if (!document) {
+        return next(new ApiError(400, `Sai mật khẩu!`))
+      }
+      var realId = document._id
+      req.body.Password = req.body.CurrentPassword
+      if (req.body.NewPassword) {
+        req.body.Password = req.body.NewPassword
       }
     }
 
-    //
-    let document = await dbService.update(req.params.id, req.body)
+    if (req.type == "reader") {
+      createValidPayload(req.body, fieldList)
+      document = await dbService.update(
+        realId,
+        createValidPayload(req.body, updateFieldList)
+      )
+    } else if (req.type == "staff") {
+      document = await dbService.update(
+        req.params.id,
+        createValidPayload(req.body, updateFieldList)
+      )
+    }
 
     if (!document) {
       return next(new ApiError(404, `${singleCollectionName} not found`))

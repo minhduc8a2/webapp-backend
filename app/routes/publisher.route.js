@@ -5,14 +5,17 @@ const controllerName = "publisher.controller"
 const express = require("express")
 const controller = require(`../controllers/${controllerName}`)
 const router = express.Router()
+const staffAuthorization = require("../middleware/staffAuthorization")
+const bothAuthorization = require("../middleware/bothReaderAndStaffAuthorization")
+
 router
   .route("/")
   .get(controller.findAll)
-  .post(controller.create)
-  .delete(controller.deleteAll)
+  .post(staffAuthorization, controller.create)
+  .delete(staffAuthorization, controller.deleteAll)
 router
   .route("/:id")
   .get(controller.findOne)
-  .put(controller.update)
-  .delete(controller.delete)
+  .put(staffAuthorization, controller.update)
+  .delete(staffAuthorization, controller.delete)
 module.exports = router

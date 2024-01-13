@@ -16,29 +16,40 @@ const MongoDB = require("../utils/mongodb.ultil")
 const jwt = require("jsonwebtoken")
 
 const auth = async (req, res, next) => {
+  console.log("reader login")
   const token = req.header("Authorization")?.replace("Bearer ", "")
-  if (!token) return next(new ApiError(400, "Vui lòng đăng nhập"))
+  if (!token) return next()
   try {
     var data = jwt.verify(token, process.env.JWT_KEY)
+
     try {
       const dbService = new DatabaseService(
         MongoDB.client,
         collection,
         fieldList
       )
-      const reader = await dbService.findOne({ MaDocGia: data.MaDocGia })
-      if (!reader) {
+
+      const reader = await dbService.findOne({ MaDocGia: data.username })
+
+      if (!reader || data.type != "reader") {
         req.logined = null
-        return next(new ApiError(400, "Không tìm thấy đoc giả!"))
+        return next()
       }
       req.logined = token
+      req.reader = {
+        MaDocGia: reader.MaDocGia,
+        HoLot: reader.HoLot,
+        Ten: reader.Ten,
+        DiaChi: reader.DiaChi,
+        DienThoai: reader.DienThoai,
+      }
 
       next()
     } catch (error) {
       return next(new ApiError(500, "Lỗi hệ thống"))
     }
   } catch (err) {
-    return next(new ApiError(400, "Token không hợp lệ!"))
+    return next()
   }
 }
 module.exports = auth

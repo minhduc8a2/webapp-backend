@@ -45,7 +45,15 @@ const ApiError = require("../api-error")
 const DatabaseService = require("../services/database.service")
 const MongoDB = require("../utils/mongodb.ultil")
 const ResponseTemplate = require("../responseTemplate")
+function createDate(date, days = 0) {
+  let currentDate = date
+  currentDate.setDate(date.getDate() + days)
+  let day = currentDate.getDate().toString().padStart(2, "0")
+  let month = (currentDate.getMonth() + 1).toString().padStart(2, "0")
+  let year = currentDate.getFullYear()
 
+  return day + "/" + month + "/" + year
+}
 exports.create = async (req, res, next) => {
   if (!req.body) {
     return next(new ApiError(400, "Form cannot be empty"))
@@ -55,6 +63,7 @@ exports.create = async (req, res, next) => {
   req.body.TrangThai = bookStatus.Pending
   //
   for (let field of fieldList) {
+    if (field == "NgayTra") continue
     if (!req.body.hasOwnProperty(field) || req.body[field].length == 0) {
       return next(new ApiError(400, field + " cannot be empty"))
     }
@@ -78,6 +87,7 @@ exports.create = async (req, res, next) => {
       MaDocGia: req.body.MaDocGia,
       MaSach: req.body.MaSach,
       NgayMuon: req.body.NgayMuon,
+      TrangThai: "Pending",
     })
     if (documents.length > 0) {
       return next(new ApiError(400, `Theo dõi mượn sách đã tồn tại!`))
@@ -106,6 +116,13 @@ exports.create = async (req, res, next) => {
     }
     //
 
+    if (req.type == "reader") {
+      if (req.body.MaDocGia != req.username) {
+        return next(
+          new ApiError(400, `Không có quyền thực hiện hành động này!`)
+        )
+      }
+    }
     const mongoDocument = await dbService.create(req.body)
 
     return res.send(
@@ -132,10 +149,10 @@ exports.findAll = async (req, res, next) => {
   let documents = []
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    const { name } = req.query
-    if (name) {
-      documents = await dbService.findByName(name)
-    } else documents = await dbService.find({})
+    if (req.type == "reader") {
+      documents = await dbService.find({ MaDocGia: req.username, ...req.query })
+    } else if (req.type == "staff") documents = await dbService.find(req.query)
+    console.log(documents)
   } catch (error) {
     return next(
       new ApiError(500, `An error occurred while retrieving ${collection}`)
@@ -148,7 +165,14 @@ exports.findAll = async (req, res, next) => {
 exports.findOne = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    document = await dbService.findById(req.params.id)
+    if (req.type == "reader") {
+      document = await dbService.findOne({
+        MaDocGia: req.username,
+        _id: req.params.id,
+      })
+    } else if (req.type == "staff") {
+      document = await dbService.findById(req.params.id)
+    }
     if (!document) {
       return next(new ApiError(404, `${singleCollectionName} not found`))
     }
@@ -163,8 +187,14 @@ exports.findOne = async (req, res, next) => {
   }
 }
 exports.update = async (req, res, next) => {
-  if (!req.body.TrangThai || !req.body.NgayMuon || !req.body.NgayTra) {
-    return next(new ApiError(400, "TrangThai cannot be empty"))
+  if (req.type == "staff") {
+    if (!req.body.TrangThai || !req.body.NgayMuon) {
+      return next(new ApiError(400, "Fields cannot be empty"))
+    }
+  } else if (req.type == "reader") {
+    if (!req.body.TrangThai) {
+      return next(new ApiError(400, "Trạng thái không được trống!"))
+    }
   }
   //check book status is valid
   if (!bookStatus.hasOwnProperty(req.body.TrangThai)) {
@@ -172,27 +202,23 @@ exports.update = async (req, res, next) => {
   }
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    const readerDBService = new DatabaseService(
-      MongoDB.client,
-      readerCollection,
-      readerFieldList
-    )
+
     let currentDocument = await dbService.findById(req.params.id)
     if (!currentDocument) {
       return next(new ApiError(400, `Theo dõi mượn sách không tồn tại!`))
     }
     //check reader exists
-    let reader = await readerDBService.findOne({ MaDocGia: req.body.MaDocGia })
-    if (!reader) {
-      return next(new ApiError(400, `Mã đọc giả không tồn tại!`))
-    }
+    // let reader = await readerDBService.findOne({ MaDocGia: req.body.MaDocGia })
+    // if (!reader) {
+    //   return next(new ApiError(400, `Mã đọc giả không tồn tại!`))
+    // }
     //  check change status
 
     let willChangeSoQuyen = 0
     let willChangeDangMuon = 0
     let willChangeDangYeuCau = 0
     let willChangeStatus = req.body.TrangThai
-
+    let readerAutoNgayTra = ""
     if (
       currentDocument.TrangThai == bookStatus.Pending ||
       currentDocument.TrangThai == bookStatus.Accepted
@@ -202,8 +228,11 @@ exports.update = async (req, res, next) => {
         willChangeDangYeuCau = -1
       } else if (
         willChangeStatus == bookStatus.Cancelled ||
-        willChangeStatus == bookStatus.Rejected
+        willChangeStatus == bookStatus.Rejected ||
+        willChangeStatus == bookStatus.Returned
       ) {
+        if (willChangeStatus == bookStatus.Returned)
+          readerAutoNgayTra = createDate(new Date(), 0)
         willChangeSoQuyen = 1
         willChangeDangYeuCau = -1
       }
@@ -216,15 +245,21 @@ exports.update = async (req, res, next) => {
         willChangeDangYeuCau = 1
       } else if (
         willChangeStatus == bookStatus.Cancelled ||
-        willChangeStatus == bookStatus.Rejected
+        willChangeStatus == bookStatus.Rejected ||
+        willChangeStatus == bookStatus.Returned
       ) {
+        if (willChangeStatus == bookStatus.Returned)
+          readerAutoNgayTra = createDate(new Date(), 0)
         willChangeDangMuon = -1
         willChangeSoQuyen = 1
       }
     } else if (
       currentDocument.TrangThai == bookStatus.Cancelled ||
-      currentDocument.TrangThai == bookStatus.Rejected
+      currentDocument.TrangThai == bookStatus.Rejected ||
+      currentDocument.TrangThai == bookStatus.Returned
     ) {
+      if (currentDocument.TrangThai == bookStatus.Returned)
+        readerAutoNgayTra = ""
       if (willChangeStatus == bookStatus.Borrowed) {
         willChangeDangMuon = 1
         willChangeSoQuyen = -1
@@ -264,11 +299,18 @@ exports.update = async (req, res, next) => {
       return next(new ApiError(404, `Failed to update book`))
     }
     //
-    let document = await dbService.update(req.params.id, {
-      TrangThai: req.body.TrangThai,
-      NgayMuon: req.body.NgayMuon,
-      NgayTra: req.body.NgayTra,
-    })
+    if (req.type == "staff") {
+      var document = await dbService.update(req.params.id, {
+        TrangThai: req.body.TrangThai,
+        NgayMuon: req.body.NgayMuon,
+        NgayTra: req.body.NgayTra,
+      })
+    } else if (req.type == "reader") {
+      var document = await dbService.update(req.params.id, {
+        TrangThai: req.body.TrangThai,
+        NgayTra: readerAutoNgayTra,
+      })
+    }
 
     if (!document) {
       return next(new ApiError(404, `${singleCollectionName} not found`))

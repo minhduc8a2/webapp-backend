@@ -14,6 +14,7 @@ const MongoDB = require("../utils/mongodb.ultil")
 const jwt = require("jsonwebtoken")
 
 const auth = async (req, res, next) => {
+  console.log("admin auth")
   const token = req.header("Authorization")?.replace("Bearer ", "")
   if (!token) return next(new ApiError(400, "Vui lòng đăng nhập"))
   try {
@@ -25,12 +26,14 @@ const auth = async (req, res, next) => {
         fieldList
       )
       const staff = await dbService.findOne({ MaNhanVien: data.MaNhanVien })
-      if (!staff) {
+      if (!staff || data.type != "staff") {
         req.logined = null
-        return next(new ApiError(400, "Không tìm thấy nhân viên!"))
+        return next(
+          new ApiError(400, "Không có quyền thực hiện hành động này!")
+        )
       }
-      req.logined = token
-
+      req.logined = true
+      req.type = data.type
       next()
     } catch (error) {
       return next(new ApiError(500, "Lỗi hệ thống"))

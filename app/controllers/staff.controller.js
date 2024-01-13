@@ -22,12 +22,30 @@ function createToken(username) {
   return jwt.sign(
     {
       data: username,
+      type: "staff",
     },
     process.env.JWT_KEY,
     { expiresIn: 60 * 60 }
   )
 }
+/// login: a different method
+exports.login = async (req, res, next) => {
+  if (req.logined) return res.send(ResponseTemplate(true, "", req.token))
+  try {
+    const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
 
+    document = await dbService.findOne({
+      MSNV: req.body.username,
+      Password: req.body.password,
+    })
+    if (!document) {
+      return res.send(ResponseTemplate(false, "", null))
+    }
+    return res.send(ResponseTemplate(true, "", createToken(req.body.username)))
+  } catch (error) {
+    return next(new ApiError(500, `Error with server`))
+  }
+}
 exports.create = async (req, res, next) => {
   if (!req.body) {
     return next(new ApiError(400, "Form cannot be empty"))
@@ -109,24 +127,7 @@ exports.findOne = async (req, res, next) => {
     )
   }
 }
-/// login: a different method
-exports.login = async (req, res, next) => {
-  if (req.logined) return res.send(ResponseTemplate(true, "", req.logined))
-  try {
-    const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
 
-    document = await dbService.findOne({
-      MSNV: req.body.username,
-      Password: req.body.password,
-    })
-    if (!document) {
-      return res.send(ResponseTemplate(false, "", null))
-    }
-    return res.send(ResponseTemplate(true, "", createToken(req.body.username)))
-  } catch (error) {
-    return next(new ApiError(500, `Error with server`))
-  }
-}
 exports.update = async (req, res, next) => {
   if (Object.keys(req.body).length === 0) {
     return next(new ApiError(400, "Data to update cannot be empty"))
