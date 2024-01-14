@@ -64,7 +64,9 @@ exports.login = async (req, res, next) => {
       Password: req.body.password,
     })
     if (!document) {
-      return res.send(ResponseTemplate(false, "", null))
+      return res.send(
+        new ApiError(401, "Tên đăng nhập hoặc mật khẩu không đúng!")
+      )
     }
     return res.send(
       ResponseTemplate(true, "", {

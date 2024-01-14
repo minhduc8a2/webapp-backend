@@ -45,15 +45,7 @@ const ApiError = require("../api-error")
 const DatabaseService = require("../services/database.service")
 const MongoDB = require("../utils/mongodb.ultil")
 const ResponseTemplate = require("../responseTemplate")
-function createDate(date, days = 0) {
-  let currentDate = date
-  currentDate.setDate(date.getDate() + days)
-  let day = currentDate.getDate().toString().padStart(2, "0")
-  let month = (currentDate.getMonth() + 1).toString().padStart(2, "0")
-  let year = currentDate.getFullYear()
 
-  return day + "/" + month + "/" + year
-}
 exports.create = async (req, res, next) => {
   if (!req.body) {
     return next(new ApiError(400, "Form cannot be empty"))
@@ -84,10 +76,26 @@ exports.create = async (req, res, next) => {
     //check if  exists
 
     let documents = await dbService.find({
-      MaDocGia: req.body.MaDocGia,
-      MaSach: req.body.MaSach,
-      NgayMuon: req.body.NgayMuon,
-      TrangThai: "Pending",
+      $or: [
+        {
+          MaDocGia: req.body.MaDocGia,
+          MaSach: req.body.MaSach,
+          NgayMuon: req.body.NgayMuon,
+          TrangThai: "Pending",
+        },
+        {
+          MaDocGia: req.body.MaDocGia,
+          MaSach: req.body.MaSach,
+          NgayMuon: req.body.NgayMuon,
+          TrangThai: "Accepted",
+        },
+        {
+          MaDocGia: req.body.MaDocGia,
+          MaSach: req.body.MaSach,
+          NgayMuon: req.body.NgayMuon,
+          TrangThai: "Borrowed",
+        },
+      ],
     })
     if (documents.length > 0) {
       return next(new ApiError(400, `Theo dõi mượn sách đã tồn tại!`))
@@ -218,7 +226,7 @@ exports.update = async (req, res, next) => {
     let willChangeDangMuon = 0
     let willChangeDangYeuCau = 0
     let willChangeStatus = req.body.TrangThai
-    let readerAutoNgayTra = ""
+    let returnedAutoNgayTra = ""
     if (
       currentDocument.TrangThai == bookStatus.Pending ||
       currentDocument.TrangThai == bookStatus.Accepted
@@ -232,7 +240,7 @@ exports.update = async (req, res, next) => {
         willChangeStatus == bookStatus.Returned
       ) {
         if (willChangeStatus == bookStatus.Returned)
-          readerAutoNgayTra = createDate(new Date(), 0)
+          returnedAutoNgayTra = new Date().toString()
         willChangeSoQuyen = 1
         willChangeDangYeuCau = -1
       }
@@ -249,7 +257,7 @@ exports.update = async (req, res, next) => {
         willChangeStatus == bookStatus.Returned
       ) {
         if (willChangeStatus == bookStatus.Returned)
-          readerAutoNgayTra = createDate(new Date(), 0)
+          returnedAutoNgayTra = new Date().toString()
         willChangeDangMuon = -1
         willChangeSoQuyen = 1
       }
@@ -259,7 +267,7 @@ exports.update = async (req, res, next) => {
       currentDocument.TrangThai == bookStatus.Returned
     ) {
       if (currentDocument.TrangThai == bookStatus.Returned)
-        readerAutoNgayTra = ""
+        returnedAutoNgayTra = ""
       if (willChangeStatus == bookStatus.Borrowed) {
         willChangeDangMuon = 1
         willChangeSoQuyen = -1
@@ -303,13 +311,20 @@ exports.update = async (req, res, next) => {
       var document = await dbService.update(req.params.id, {
         TrangThai: req.body.TrangThai,
         NgayMuon: req.body.NgayMuon,
-        NgayTra: req.body.NgayTra,
+        NgayTra: req.body.NgayTra || returnedAutoNgayTra,
       })
     } else if (req.type == "reader") {
-      var document = await dbService.update(req.params.id, {
-        TrangThai: req.body.TrangThai,
-        NgayTra: readerAutoNgayTra,
-      })
+      if (
+        currentDocument.TrangThai == "Pending" ||
+        currentDocument.TrangThai == "Accepted"
+      ) {
+        var document = await dbService.update(req.params.id, {
+          TrangThai: req.body.TrangThai,
+        })
+      } else
+        return next(
+          new ApiError(401, `Không có quyền thực hiện hành động này!`)
+        )
     }
 
     if (!document) {

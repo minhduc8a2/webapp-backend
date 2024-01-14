@@ -39,7 +39,9 @@ exports.login = async (req, res, next) => {
       Password: req.body.password,
     })
     if (!document) {
-      return res.send(ResponseTemplate(false, "", null))
+      return res.send(
+        new ApiError(401, `Tên đăng nhập hoặc mật khẩu không đúng!`)
+      )
     }
     return res.send(ResponseTemplate(true, "", createToken(req.body.username)))
   } catch (error) {
@@ -196,10 +198,17 @@ exports.delete = async (req, res, next) => {
 exports.deleteAll = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-
+    let documents = await dbService.find({})
+    if (documents.length == 1) {
+      return next(
+        new ApiError(400, `Phải tồn tại ít nhất 1 ${singleCollectionName}!`)
+      )
+    }
+    const survivedStaff = documents[0]
     let deletedCount = await dbService.deleteAll()
+    let insertSurvivedStaff = await dbService.create(survivedStaff)
     return res.send(
-      ResponseTemplate(true, `${deletedCount} ${collection} deleted`, null)
+      ResponseTemplate(true, `${deletedCount - 1} ${collection} deleted`, null)
     )
   } catch (error) {
     return next(
