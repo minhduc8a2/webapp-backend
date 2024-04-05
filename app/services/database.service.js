@@ -26,6 +26,10 @@ class DatabaseService {
     const cursor = await this.collection.find(filter)
     return await cursor.toArray()
   }
+  async getCount(filter) {
+    const cursor = await this.collection.find(filter)
+    return (await cursor.toArray())?.length || 0
+  }
   async findOne(filter) {
     return await this.collection.findOne(filter)
   }

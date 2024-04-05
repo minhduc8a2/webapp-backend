@@ -173,7 +173,15 @@ exports.update = async (req, res, next) => {
 exports.delete = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-
+    if ((await dbService.getCount()) <= 1) {
+      return res.send(
+        ResponseTemplate(
+          false,
+          `Không thể xóa nhân viên duy nhất trong hệ thống`,
+          null
+        )
+      )
+    }
     let document = await dbService.delete(req.params.id)
 
     if (!document) {

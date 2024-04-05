@@ -13,6 +13,15 @@ const fieldList = [
 const collection = "Sach"
 const singleCollectionName = "Sach"
 
+const theoDoiMuonSachFieldList = [
+  "MaDocGia",
+  "MaSach",
+  "NgayMuon",
+  "NgayTra",
+  "TrangThai",
+]
+const theoDoiMuonSachCollection = "TheoDoiMuonSach"
+
 // configuration for NXB
 const NXBFieldList = ["MaNXB", "TenNXB", "DiaChi"]
 const NXBCollection = "NhaXuatBan"
@@ -178,10 +187,19 @@ exports.update = async (req, res, next) => {
   }
 }
 exports.delete = async (req, res, next) => {
+  const id = req.params.id
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-
-    let document = await dbService.delete(req.params.id)
+    if (checkUsed(id)) {
+      return res.send(
+        ResponseTemplate(
+          false,
+          "Không thể xóa! Sách đang được sử dụng trong hệ thống!",
+          null
+        )
+      )
+    }
+    let document = await dbService.delete(id)
 
     if (!document) {
       return next(new ApiError(404, `${singleCollectionName} not found`))
@@ -197,7 +215,7 @@ exports.delete = async (req, res, next) => {
     return next(
       new ApiError(
         500,
-        `Could not delete ${singleCollectionName} with id=${req.params.id}`
+        `Could not delete ${singleCollectionName} with id=${id}`
       )
     )
   }
@@ -205,7 +223,15 @@ exports.delete = async (req, res, next) => {
 exports.deleteAll = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-
+    if (checkUsed("all")) {
+      return res.send(
+        ResponseTemplate(
+          false,
+          "Không thể xóa! Sách đang được sử dụng trong hệ thống!",
+          null
+        )
+      )
+    }
     let deletedCount = await dbService.deleteAll()
     return res.send(
       ResponseTemplate(true, `${deletedCount} ${collection} deleted`, null)
@@ -215,4 +241,24 @@ exports.deleteAll = async (req, res, next) => {
       new ApiError(500, `An Error occurred while removing all ${collection}`)
     )
   }
+}
+
+async function checkUsed(id) {
+  //check being used
+  const sachDbService = new DatabaseService(
+    MongoDB.client,
+    theoDoiMuonSachCollection,
+    theoDoiMuonSachFieldList
+  )
+  if (id == "all") {
+    let checkUsed = await sachDbService.find({})
+    if (checkUsed.length > 0) return true
+  }
+  if (id != "all") {
+    let checkUsed = await sachDbService.find({ MaNXB: id })
+    if (checkUsed.length > 0) return true
+  }
+
+  return false
+  //
 }
