@@ -148,8 +148,8 @@ exports.delete = async (req, res, next) => {
   const id = req.params.id
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-
-    if (checkUsed(id)) {
+    const currentPublisher = await dbService.findById(id)
+    if (await checkUsed(currentPublisher.MaNXB)) {
       return res.send(
         ResponseTemplate(
           false,
@@ -182,7 +182,7 @@ exports.delete = async (req, res, next) => {
 exports.deleteAll = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    if (checkUsed("all")) {
+    if (await checkUsed("all")) {
       return res.send(
         ResponseTemplate(
           false,
@@ -201,19 +201,19 @@ exports.deleteAll = async (req, res, next) => {
     )
   }
 }
-async function checkUsed(id) {
+async function checkUsed(MaNXB) {
   //check being used
   const sachDbService = new DatabaseService(
     MongoDB.client,
     sachCollection,
     sachFieldList
   )
-  if (id == "all") {
+  if (MaNXB == "all") {
     let checkUsed = await sachDbService.find({})
     if (checkUsed.length > 0) return true
   }
-  if (id != "all") {
-    let checkUsed = await sachDbService.find({ MaNXB: id })
+  if (MaNXB != "all") {
+    let checkUsed = await sachDbService.find({ MaNXB })
     if (checkUsed.length > 0) return true
   }
 

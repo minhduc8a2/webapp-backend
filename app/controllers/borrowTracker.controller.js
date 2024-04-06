@@ -124,6 +124,17 @@ exports.create = async (req, res, next) => {
     }
     //
 
+    //check return date
+    if (req.body.NgayTra != "") {
+      if (
+        new Date(req.body.NgayTra).getTime() <
+        new Date(req.body.NgayMuon).getTime()
+      ) {
+        return next(new ApiError(400, `Ngày trả không hợp lệ!`))
+      } else req.body.TrangThai = bookStatus.Returned
+    }
+    //
+
     if (req.type == "reader") {
       if (req.body.MaDocGia != req.username) {
         return next(
@@ -208,6 +219,19 @@ exports.update = async (req, res, next) => {
   if (!bookStatus.hasOwnProperty(req.body.TrangThai)) {
     return next(new ApiError(400, "TrangThai is not valid"))
   }
+
+  //check return date
+  if (req.body.NgayTra != "") {
+    if (
+      new Date(req.body.NgayTra).getTime() <
+      new Date(req.body.NgayMuon).getTime()
+    ) {
+      return next(new ApiError(400, `Ngày trả không hợp lệ!`))
+    } else if (req.body.TrangThai != bookStatus.Returned) {
+      return next(new ApiError(400, `Trạng thái phải là "Đã trả"!`))
+    }
+  }
+  //
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
 
@@ -220,6 +244,7 @@ exports.update = async (req, res, next) => {
     // if (!reader) {
     //   return next(new ApiError(400, `Mã đọc giả không tồn tại!`))
     // }
+
     //  check change status
 
     let willChangeSoQuyen = 0

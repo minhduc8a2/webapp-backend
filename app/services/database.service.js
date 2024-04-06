@@ -65,8 +65,8 @@ class DatabaseService {
     return result
   }
 
-  async deleteAll() {
-    const result = await this.collection.deleteMany({})
+  async deleteAll(options={}) {
+    const result = await this.collection.deleteMany(options)
     return result.deletedCount
   }
 }

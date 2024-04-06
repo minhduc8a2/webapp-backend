@@ -22,6 +22,14 @@ const updateFieldList = [
 ]
 const collection = "DocGia"
 const singleCollectionName = "DocGia"
+const borrowTrackerFieldList = [
+  "MaDocGia",
+  "MaSach",
+  "NgayMuon",
+  "NgayTra",
+  "TrangThai",
+]
+const borrowTrackerCollection = "TheoDoiMuonSach"
 const jwt = require("jsonwebtoken")
 //configure in create, update method also
 //
@@ -256,7 +264,7 @@ exports.delete = async (req, res, next) => {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
 
     let document = await dbService.delete(req.params.id)
-
+    await deleteBorrowTrackerAfterDeleteReader(document.MaDocGia)
     if (!document) {
       return next(new ApiError(404, `${singleCollectionName} not found`))
     }
@@ -281,6 +289,8 @@ exports.deleteAll = async (req, res, next) => {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
 
     let deletedCount = await dbService.deleteAll()
+    await deleteBorrowTrackerAfterDeleteReader("")
+
     return res.send(
       ResponseTemplate(true, `${deletedCount} ${collection} deleted`, null)
     )
@@ -289,4 +299,17 @@ exports.deleteAll = async (req, res, next) => {
       new ApiError(500, `An Error occurred while removing all ${collection}`)
     )
   }
+}
+
+async function deleteBorrowTrackerAfterDeleteReader(MaDocGia) {
+  const borrowTrackerDbService = new DatabaseService(
+    MongoDB.client,
+    borrowTrackerCollection,
+    borrowTrackerFieldList
+  )
+  if (MaDocGia != "")
+    await borrowTrackerDbService.deleteAll({
+      MaDocGia: document.MaDocGia,
+    })
+  else await borrowTrackerDbService.deleteAll()
 }

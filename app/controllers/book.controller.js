@@ -13,14 +13,14 @@ const fieldList = [
 const collection = "Sach"
 const singleCollectionName = "Sach"
 
-const theoDoiMuonSachFieldList = [
+const borrowTrackerFieldList = [
   "MaDocGia",
   "MaSach",
   "NgayMuon",
   "NgayTra",
   "TrangThai",
 ]
-const theoDoiMuonSachCollection = "TheoDoiMuonSach"
+const borrowTrackerCollection = "TheoDoiMuonSach"
 
 // configuration for NXB
 const NXBFieldList = ["MaNXB", "TenNXB", "DiaChi"]
@@ -190,7 +190,8 @@ exports.delete = async (req, res, next) => {
   const id = req.params.id
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    if (checkUsed(id)) {
+    const currentBook = await dbService.findById(id)
+    if (await checkUsed(currentBook.MaSach)) {
       return res.send(
         ResponseTemplate(
           false,
@@ -223,7 +224,7 @@ exports.delete = async (req, res, next) => {
 exports.deleteAll = async (req, res, next) => {
   try {
     const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
-    if (checkUsed("all")) {
+    if (await checkUsed("")) {
       return res.send(
         ResponseTemplate(
           false,
@@ -243,19 +244,19 @@ exports.deleteAll = async (req, res, next) => {
   }
 }
 
-async function checkUsed(id) {
+async function checkUsed(MaSach) {
   //check being used
-  const sachDbService = new DatabaseService(
+  const borrowTrackerDbService = new DatabaseService(
     MongoDB.client,
-    theoDoiMuonSachCollection,
-    theoDoiMuonSachFieldList
+    borrowTrackerCollection,
+    borrowTrackerFieldList
   )
-  if (id == "all") {
-    let checkUsed = await sachDbService.find({})
+  if (MaSach == "") {
+    let checkUsed = await borrowTrackerDbService.find({})
     if (checkUsed.length > 0) return true
   }
-  if (id != "all") {
-    let checkUsed = await sachDbService.find({ MaNXB: id })
+  if (MaSach != "") {
+    let checkUsed = await borrowTrackerDbService.find({ MaSach: MaSach })
     if (checkUsed.length > 0) return true
   }
 
