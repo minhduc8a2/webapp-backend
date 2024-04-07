@@ -125,13 +125,15 @@ exports.create = async (req, res, next) => {
     //
 
     //check return date
-    if (req.body.NgayTra != "") {
+    if (req.body.NgayTra != "" && req.body.NgayTra != undefined) {
       if (
         new Date(req.body.NgayTra).getTime() <
         new Date(req.body.NgayMuon).getTime()
       ) {
         return next(new ApiError(400, `Ngày trả không hợp lệ!`))
-      } else req.body.TrangThai = bookStatus.Returned
+      } else {
+        req.body.TrangThai = bookStatus.Returned
+      }
     }
     //
 
