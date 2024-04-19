@@ -28,6 +28,26 @@ function createToken(username) {
     { expiresIn: 60 * 60 }
   )
 }
+
+// admin account
+exports.initAdminAccount = async () => {
+  const dbService = new DatabaseService(MongoDB.client, collection, fieldList)
+  let documents = await dbService.find({})
+  if (documents.length > 0) {
+    return
+  }
+  const document = await dbService.create({
+    MSNV: "admin",
+    HoTenNV: "Administrator",
+    Password: "12345678",
+    ChucVu: "Quản lý",
+    DiaChi: "Cần Thơ",
+    SoDienThoai: "0939999999",
+  })
+  if (document) {
+    console.log("Admin created successfully")
+  }
+}
 /// login: a different method
 exports.login = async (req, res, next) => {
   if (req.logined) return res.send(ResponseTemplate(true, "", req.token))
