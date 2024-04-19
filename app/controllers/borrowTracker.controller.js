@@ -293,7 +293,7 @@ exports.update = async (req, res, next) => {
       currentDocument.TrangThai == bookStatus.Rejected ||
       currentDocument.TrangThai == bookStatus.Returned
     ) {
-      if (currentDocument.TrangThai == bookStatus.Returned)
+      if (willChangeStatus == bookStatus.Returned)
         returnedAutoNgayTra = new Date().toString()
       if (willChangeStatus == bookStatus.Borrowed) {
         willChangeDangMuon = 1
