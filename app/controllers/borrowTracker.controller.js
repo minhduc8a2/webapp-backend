@@ -223,7 +223,7 @@ exports.update = async (req, res, next) => {
   }
 
   //check return date
-  if (req.body.NgayTra != "") {
+  if (req.body.NgayTra && req.body.NgayTra != "") {
     if (
       new Date(req.body.NgayTra).getTime() <
       new Date(req.body.NgayMuon).getTime()
@@ -294,7 +294,7 @@ exports.update = async (req, res, next) => {
       currentDocument.TrangThai == bookStatus.Returned
     ) {
       if (currentDocument.TrangThai == bookStatus.Returned)
-        returnedAutoNgayTra = ""
+        returnedAutoNgayTra = new Date().toString()
       if (willChangeStatus == bookStatus.Borrowed) {
         willChangeDangMuon = 1
         willChangeSoQuyen = -1
@@ -332,6 +332,11 @@ exports.update = async (req, res, next) => {
     })
     if (!updatedBook) {
       return next(new ApiError(404, `Failed to update book`))
+    }
+    //ngay tra
+    if (willChangeStatus != bookStatus.Returned) {
+      req.body.NgayTra = ""
+      returnedAutoNgayTra = ""
     }
     //
     if (req.type == "staff") {
